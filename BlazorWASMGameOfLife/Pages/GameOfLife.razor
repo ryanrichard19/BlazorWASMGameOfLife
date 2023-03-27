@@ -1,0 +1,113 @@
+﻿@page "/gameoflife"
+@using System.Threading
+
+<h3>Conway's Game of Life</h3>
+
+<div>
+    <button @onclick="Start">Start</button>
+    <button @onclick="Stop">Stop</button>
+</div>
+
+<svg width="@(CellSize * Columns)" height="@(CellSize * Rows)">
+    @for (int row = 0; row < Rows; row++)
+    {
+        for (int col = 0; col < Columns; col++)
+        {
+            <rect x="@(CellSize * col)" y="@(CellSize * row)" width="@(CellSize - 1)" height="@(CellSize - 1)" fill="@(board[row, col] ? "black" : "white")" />
+        }
+    }
+</svg>
+
+@code {
+    private const int Rows = 50;
+    private const int Columns = 50;
+    private const int CellSize = 10;
+    private const int UpdateIntervalMs = 100;
+
+    private bool[,] board = new bool[Rows, Columns];
+    private CancellationTokenSource cts;
+
+    private void Start()
+    {
+        cts?.Cancel();
+        cts = new CancellationTokenSource();
+        InitializeBoard();
+        _ = UpdateBoardLoop(cts.Token);
+    }
+
+    private void Stop()
+    {
+        cts?.Cancel();
+    }
+
+    private void InitializeBoard()
+    {
+        var random = new Random();
+
+        for (int row = 0; row < Rows; row++)
+        {
+            for (int col = 0; col < Columns; col++)
+            {
+                board[row, col] = random.Next(2) == 1;
+            }
+        }
+    }
+
+    private async Task UpdateBoardLoop(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            board = GetNextGeneration();
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(UpdateIntervalMs, cancellationToken);
+        }
+    }
+
+    private bool[,] GetNextGeneration()
+    {
+        bool[,] newBoard = new bool[Rows, Columns];
+
+        for (int row = 0; row < Rows; row++)
+        {
+            for (int col = 0; col < Columns; col++)
+            {
+                int aliveNeighbors = CountAliveNeighbors(row, col);
+
+                if (board[row, col])
+                {
+                    newBoard[row, col] = aliveNeighbors == 2 || aliveNeighbors == 3;
+                }
+                else
+                {
+                    newBoard[row, col] = aliveNeighbors == 3;
+                }
+            }
+        }
+
+        return newBoard;
+    }
+
+    private int CountAliveNeighbors(int row, int col)
+    {
+        int count = 0;
+
+        for (int i = -1; i <= 1; i++)
+        {
+            for (int j = -1; j <= 1; j++)
+            {
+                if (i == 0 && j == 0)
+                {
+                    continue;
+                }
+
+                int newRow = (row + i + Rows) % Rows;
+                int newCol = (col + j + Columns) % Columns;
+
+                count += board[newRow, newCol] ? 1 : 0;
+            }
+        }
+
+        return count;
+    }
+}
+
